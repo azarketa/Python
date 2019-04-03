@@ -1,0 +1,24 @@
+DONE
+Need to implement struct-like objects in Python:
+	-Feasible; follow the next link: https://stackoverflow.com/questions/35988/c-like-structures-in-python
+		-Implement "dataclasses".
+
+Need to know what the decorators do exactly.
+
+DONE
+Need to document the code properly.
+	-The different function for the __init__ are not explained.
+	-The philosophy or workflow does not seem correctly defined.
+
+Flask --> Web development.
+	-
+	-
+
+Kivy --> GUI development.
+
+Hovercraft! --> Slides, presentations.
+
+Type annotations and type checker.
+	-Mypy --> Package for type-checking.
+	-PEP 3107 (https://www.python.org/dev/peps/pep-3107/)
+	-Smart introduction (https://www.youtube.com/watch?v=pMgmKJyWKn8)
