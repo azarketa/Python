@@ -7,10 +7,6 @@ This file is intended to act as a side-module to scripts that aim at processing 
 to process such files that store MGEP's wind tunnel data.
 """
 
-# TODO: conceal 'means_group' when necessary (i.e. when not calling its initializer directly); show only when calling initializer
-# directly or when calling the public method 'process_means()'.
-# TODO: implement conditional for skipping the processing part on the private method '__set_wake_rake__()' whenever the group
-# already exists. Same goes for the future implementation of the private method '__set_kistler__()'.
 # TODO: an attribute look-up method (searcher) would be advisable for faster plotting ('hasattr()', 'getattr()').
 
 ######################################################################################################################
@@ -145,7 +141,6 @@ class TdmsFileRoot:
         
         """
         
-        print(colored('----------Attempting ', color='grey', attrs=['bold']) + colored(file_alias, color='blue', attrs=['bold']) + colored('----------', color='grey', attrs=['bold']))
         # Calling Python's dynamic method lookup 'getattr' to get the proper initializer, thus avoiding the 
         # need of an exceedingly long 'if' tree.
         getattr(self, "__" + tdms_file_read_mode.name + "_init__")(file_path, file_alias, ref_mag)
@@ -329,7 +324,7 @@ class TdmsFileRoot:
         # The string replacements are meant to avoid having non-allowed characters on the declared variables, such
         # as white spaces or special characters (!"·$%&/()=?¿\).
         for prop in list(self.__file__.object().properties.items()):
-            self.__setattr__('__' + prop[0].replace(' ', '_').replace('(', '').replace(')', '') + '__', prop[1])
+            self.__setattr__('__' + prop[0].lower().replace(' ', '_').replace('(', '').replace(')', '') + '__', prop[1])
 
     # Internal __add_isolated_groups__ method.
     def __add_isolated_groups__(self, isolated_groups_name):
@@ -435,12 +430,40 @@ class TdmsFileRoot:
         corresponding lists.
 
         """
-
-        # Calling the internal method __setMeansAttributes__() in case it is necessary to set the attribute structure,
-        # and storing the return boolean in the boolean_flag variable.
-        boolean_flag = self.__set_mean_attributes__()
-
-        if boolean_flag:
+        
+        # Getting the current frame by inspect.
+        cur_frame = inspect.currentframe()
+        # Getting the outer frame to determine the caller function's name.
+        cal_frame = inspect.getouterframes(cur_frame, 2)
+        cal_func_name = cal_frame[1][3]   
+        
+        # Conditional that checks whether the caller function is the any of the means processing initializers ('__means_init__()', 
+        # '__means_only_init__()').    
+        if cal_func_name in ['__means_init__', '__means_only_init__']:
+            # If the caller function is any containing means processing, then pass.
+            pass
+        else:
+            if hasattr(self, 'groups_added') and hasattr(self.groups_added, 'means_group'):
+                 # If the TdmsFileRoot instance already owns a 'means_group' group, then the processing is skipped.
+                 print('Means already processed; skipping processing.')
+                 return
+            elif not hasattr(self, 'groups_added'):
+                # If the TdmsFileRoot instance does not own a 'groups_added' group, then it is necessary to call the '__set_means__()'
+                # method.
+                self.__set_means__()
+            elif not hasattr(self.groups_added, "means_group") and not hasattr(self.groups_added, "__means_group__"):
+                # If the TdmsFileRoot instance neither owns 'means_group' nor '__means_group__' groups, then it is necessary to call the
+                # '__set_means__()' method.
+                self.__set_means__()
+            elif not hasattr(self.groups_added, "means_group") and hasattr(self.groups_added, "__means_group__"):
+                # If the TdmsFileRoot instance owns a private '__means_group__' group, then it is necessary to perform a variable change
+                # by dumping the '__means_group__' object into the public 'means_group' object.
+                self.groups_added.__setattr__("means_group", self.groups_added.__means_group__)
+                del self.groups_added.__means_group__
+            
+        # Conditional dependent on the call to the internal method '__set_means_attributes__()'. The conditional is executed in case
+        # it is necessary to set the attribute structure.           
+        if self.__set_mean_attributes__():
             # A groups level "for" loop that runs over the groups on the TDMS file (excluding "Initial drift" and "Final
             # drift" groups that are not meant to provide data-analysis information).
             for group in [group for group in self.__file__.groups() if group not in ["Initial drift", "Final drift"]]:
@@ -468,7 +491,7 @@ class TdmsFileRoot:
                     if hasattr(self.groups_added.means_group.means_channels, channel.replace(" ", "_")):
                         self.groups_added.means_group.means_channels.__getattribute__(channel.replace(" ", "_")).append(np.average(self.groups_original.__getattribute__(group).channels.__getattribute__(channel).data))
                     else:
-                        self.groups_added.means_group.means_channels.__setattr__(channel.replace(" ", "_"), [np.average(self.groups_original.__getattribute__(group).channels.__getattribute__(channel).data)])
+                        self.groups_added.means_group.means_channels.__setattr__(channel.replace(" ", "_"), [np.average(self.groups_original.__getattribute__(group).channels.__getattribute__(channel).data)])                        
 
     # TODO: DOCUMENT METHOD CORRECTLY.
     # Internal __set_wake_rake__ method.
@@ -502,8 +525,8 @@ class TdmsFileRoot:
             means_group_deleted = True
         else:
             # Conditional tree in case the caller function is not the wake rake initializer.
-            if hasattr(self, "group_added") and hasattr(self.groups_added, 'wake_rake_group'):
-                # If the TdmsFileRoot instance already owns a wake rake group, then the processing is skipped.
+            if hasattr(self, "groups_added") and hasattr(self.groups_added, 'wake_rake_group'):
+                # If the TdmsFileRoot instance already owns a 'wake_rake_group' group, then the processing is skipped.
                 print('Wake rake already processed; skipping processing.')
                 return
             if not hasattr(self, "groups_added"):
@@ -794,6 +817,7 @@ class TdmsFileRoot:
                         self.groups_added.means_group.means_channels.__setattr__("drag", [np.average(drag)])
                         self.groups_added.means_group.means_channels.__setattr__("lift", [np.average(lift)])
 
+    # TODO: DOCUMENT METHOD CORRECTLY.
     # Internal __non_dimensionalize__ method.
     def __non_dimensionalize__(self, file_obj, ref_mag):
         """Non-dimensionalizes data coming from the TDMS file.
@@ -1390,6 +1414,7 @@ class RefMagnitudes:
     # Public methods are intended to provide general functionalities on data manipulation, such as automated
     # file opening, programmatic variable declaration or fast plotting.
 
+# TODO: DOCUMENT METHOD CORRECTLY.
 # Public method open_list_of_files.
 def open_list_of_files(list_of_files, reload=False):
     """Opens a list of TDMS files in a provided reading mode.
@@ -1429,7 +1454,9 @@ def open_list_of_files(list_of_files, reload=False):
     # A "for" loop running over the files on the list_of_file_variables variable and programmatically declaring them
     # with sequential names ranging from "file1" to "fileN", where N stands for the number of files in list_of_file
     # variables. The declarations are done as instantiations of the tdmsFileRoot object.
-    for file in list_of_files:        
+    for file in list_of_files:
+        # Printing statement for notifying the beginning of a file's opening process.
+        print(colored('----------Attempting ', color='grey', attrs=['bold']) + colored(file.file_alias, color='blue', attrs=['bold']) + colored('----------', color='grey', attrs=['bold']))
         if type(file) == TdmsFileData:
             path = file.file_path
             file_alias_no_whitespace = file.file_alias.replace(" ", "_")
@@ -1456,7 +1483,7 @@ def open_list_of_files(list_of_files, reload=False):
             caller_frame.f_globals[file.file_alias.replace(" ", "_")] = XFoilRoot(angles, lift, drag, eff, pitch)
             list_of_file_variables.append(file.file_alias.replace(" ", "_"))
             # Printing statement for monitoring the programmatic declaration/instantiation process.
-            print("XFoil file " + str(list_of_files.index(file) + 1) + " of " + str(len(list_of_files)) + " opened; " + colored(file.fileAlias.replace(" ", "_"), color="blue", attrs=["bold"]) + " global variable has been " + colored("created", color="green", attrs=["bold"]) + ".")
+            print("XFoil file " + str(list_of_files.index(file) + 1) + " of " + str(len(list_of_files)) + " opened; " + colored(file.fileAlias.replace(" ", "_"), color="blue", attrs=["bold"]) + " global variable has been " + colored("created", color="green", attrs=["bold"]) + ".")        
 
     # Damping the list_of_file_variables variable to the global_dict dictionary.
     # global_dict["list_of_file_variables"] = list_of_file_variables
