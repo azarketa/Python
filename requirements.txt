@@ -1,0 +1,8 @@
+numpy==1.15.*
+matplotlib==3.*
+mpld3==0.*
+nptdms==0.13.*
+scipy==1.1.*
+dataclasses==0.*
+pillow==5.4.*
+termcolor==1.1.*
